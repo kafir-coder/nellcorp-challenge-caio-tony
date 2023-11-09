@@ -232,6 +232,13 @@ func (ah *AccountHandler) RefundMoney(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 
+		if err == services.ErrInexistentTransaction {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Inexistent transaction",
+			})
+			return
+		}
 		if err == services.ErrUnableToRefundARefund {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{

@@ -124,7 +124,11 @@ func (as *Account) IsTheSumofRecipientsAmountsGreaterThanTransferAmount(ctx cont
 func (as *Account) RefundMoneyNormalTransfer(ctx context.Context, transactionId string) error {
 
 	transaction, err := as.transactionRepo.GetTransaction(ctx, transactionId)
+
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrInexistentTransaction
+		}
 		return err
 	}
 	if transaction.IsRefund {
