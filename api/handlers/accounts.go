@@ -6,8 +6,6 @@ import (
 	requestparams "go-sample/api/handlers/request-params"
 	"go-sample/api/handlers/services"
 	"go-sample/api/utils"
-	accountrepo "go-sample/storage/account-repo"
-	transactionrepo "go-sample/storage/transaction-repo"
 	"go-sample/types"
 	"net/http"
 	"strconv"
@@ -16,20 +14,14 @@ import (
 )
 
 type AccountHandler struct {
-	accountRepo     accountrepo.IAccountRepo
-	transactionRepo transactionrepo.ITransactionRepo
-	accountSrv      services.Account
+	accountSrv services.Account
 }
 
 func NewAccountRepoHandler(
-	accountRepo accountrepo.AccountRepo,
-	transactionRepo transactionrepo.TransactionRepo,
 	accountSrv services.Account,
 ) *AccountHandler {
 	return &AccountHandler{
-		accountRepo:     accountRepo,
-		transactionRepo: transactionRepo,
-		accountSrv:      accountSrv,
+		accountSrv: accountSrv,
 	}
 }
 

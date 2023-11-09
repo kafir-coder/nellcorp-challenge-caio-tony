@@ -30,7 +30,7 @@ func (s *Server) Start() error {
 
 	accountSrv := services.NewAccount(accountRepo, transactionRepo)
 
-	accountHandler := handlers.NewAccountRepoHandler(accountRepo, transactionRepo, accountSrv)
+	accountHandler := handlers.NewAccountRepoHandler(accountSrv)
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
