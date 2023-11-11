@@ -24,4 +24,4 @@ default on port 8080. env vars are located in docker-compose.yml in the project 
 
 ## API SPECIFICATION
 
-A insomnia collection specification file (```Insomnia_2023-11-09.json```) is located in the project root directory
+A insomnia collection specification file (```Insomnia.json```) is located in the project root directory
