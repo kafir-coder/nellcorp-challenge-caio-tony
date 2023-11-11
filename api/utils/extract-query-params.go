@@ -11,5 +11,6 @@ func ExtracteQueryParams(req *http.Request) ([]byte, error) {
 	for name, values := range queryParams {
 		query[name] = values[0]
 	}
+
 	return json.Marshal(query)
 }

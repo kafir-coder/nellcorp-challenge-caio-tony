@@ -18,5 +18,12 @@ func (t *TransferMoneyRequest) Validate() bool {
 		amountSum += recipient.Amount
 	}
 
-	return amountSum <= t.Amount
+	if t.Amount <= 0 {
+		return false
+	}
+
+	if amountSum != t.Amount {
+		return false
+	}
+	return true
 }

@@ -37,6 +37,8 @@ func (s *Server) Start() error {
 		w.Write([]byte("welcome"))
 	})
 	r.Post("/accounts", accountHandler.CreateAccount)
+	r.Get("/accounts", accountHandler.ListAccounts)
+	r.Get("/accounts/{id}", accountHandler.GetAccount)
 	r.Get("/accounts/{id}/balance", accountHandler.GetAccountBalance)
 	r.Get("/accounts/{id}/transactions", accountHandler.GetTransactionsHistory)
 	r.Post("/accounts/{id}/deposit", accountHandler.DepositMoney)

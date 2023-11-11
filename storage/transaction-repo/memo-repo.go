@@ -39,3 +39,7 @@ func (tr *MemoTransactionRepo) GetTransaction(ctx context.Context, id string) (*
 func (tr *MemoTransactionRepo) GetMultiBeneficiaryTransactions(ctx context.Context, multibeneficiaryid string) ([]*types.Transaction, error) {
 	return tr.transactions, nil
 }
+
+func (tr *MemoTransactionRepo) MakeTransferTransaction(ctx context.Context, from string, to string, amount float64) error {
+	return nil
+}

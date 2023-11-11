@@ -27,5 +27,5 @@ func NewAccount(owner_id string, balance float64) *Account {
 }
 
 func (a *Account) ValidateAccount() bool {
-	return a.Balance >= 0
+	return a.Owner != "" && a.Balance >= 0
 }

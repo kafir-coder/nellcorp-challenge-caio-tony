@@ -2,64 +2,78 @@ package accountrepo
 
 import (
 	"context"
-	"errors"
+	requestparams "go-sample/api/handlers/request-params"
 	"go-sample/types"
-
-	"github.com/stretchr/testify/mock"
 )
 
-type MemoAccountRepo struct {
-	accounts []*types.Account
-	mock.Mock
+type MockCreateAccount struct {
+	Called                     bool
+	Calls                      int
+	ExpectedReturnError        error
+	ExpectedReturnErrorMessage string
+	ExpectedReturn             string
 }
 
-func NewMemoAccountRepo() *MemoAccountRepo {
+type MockGetAccountByOwnerId struct {
+	Called                     bool
+	Calls                      int
+	ExpectedReturnError        error
+	ExpectedReturnErrorMessage string
+	ExpectedReturn             *types.Account
+}
+
+type MockGetAccountBalance struct {
+	Called                     bool
+	Calls                      int
+	ExpectedReturnError        error
+	ExpectedReturnErrorMessage string
+	ExpectedReturn             float64
+}
+
+type MockMemoAccountRepo struct {
+	accounts             []*types.Account
+	McreateAccount       MockCreateAccount
+	MgetAccountBYOwnerId MockGetAccountByOwnerId
+	MgetAccountBalance   MockGetAccountBalance
+}
+
+func NewMockMemoAccountRepo() *MockMemoAccountRepo {
 	accounts := []*types.Account{}
-	return &MemoAccountRepo{
+	return &MockMemoAccountRepo{
 		accounts: accounts,
 	}
 }
 
-func (m *MemoAccountRepo) CreateAccount(ctx context.Context, account *types.Account) error {
-	m.accounts = append(m.accounts, account)
-	args := m.Called(ctx, account)
-	return args.Error(0)
+func (m *MockMemoAccountRepo) CreateAccount(ctx context.Context, account *types.Account) (string, error) {
+	m.McreateAccount.Called = true
+	m.McreateAccount.Calls++
+	return m.McreateAccount.ExpectedReturn, m.McreateAccount.ExpectedReturnError
 }
 
-func (m *MemoAccountRepo) GetAccountById(ctx context.Context, id string) (*types.Account, error) {
-	args := m.Called(ctx, id)
-
-	for _, account := range m.accounts {
-		if account.ID == id {
-			return account, nil
-		}
-	}
-	return args.Get(0).(*types.Account), args.Error(0)
+func (m *MockMemoAccountRepo) ListAccounts(context.Context, requestparams.ListAccountsRequest) ([]*types.Account, error) {
+	return nil, nil
 }
 
-func (m *MemoAccountRepo) GetAccountByOwnerId(ctx context.Context, ownerId string) (*types.Account, error) {
-	args := m.Called(ctx, ownerId)
-	return args.Get(0).(*types.Account), args.Error(1)
+func (m *MockMemoAccountRepo) GetAccountById(ctx context.Context, id string) (*types.Account, error) {
+	return nil, nil
 }
 
-func (m *MemoAccountRepo) GetAccountBalance(ctx context.Context, accountId string) (float64, error) {
-
-	args := m.Called(ctx, accountId)
-	s, _ := args.Get(0).(float64)
-	return s, args.Error(1)
+func (m *MockMemoAccountRepo) GetAccountByOwnerId(ctx context.Context, ownerId string) (*types.Account, error) {
+	m.MgetAccountBYOwnerId.Called = true
+	m.MgetAccountBYOwnerId.Calls++
+	return m.MgetAccountBYOwnerId.ExpectedReturn, m.MgetAccountBYOwnerId.ExpectedReturnError
 }
 
-func (m *MemoAccountRepo) IncrBalance(ctx context.Context, accountId string, incr float64) error {
-	args := m.Called(ctx, accountId, incr)
-	return args.Error(0)
+func (m *MockMemoAccountRepo) GetAccountBalance(ctx context.Context, accountId string) (float64, error) {
+	m.MgetAccountBalance.Called = true
+	m.MgetAccountBalance.Calls++
+	return m.MgetAccountBalance.ExpectedReturn, m.MgetAccountBalance.ExpectedReturnError
 }
 
-func (m *MemoAccountRepo) DecrBalance(ctx context.Context, accountId string, incr float64) error {
-	for i, a := range m.accounts {
-		if a.ID == accountId {
-			m.accounts[i].Balance -= incr
-			return nil
-		}
-	}
-	return errors.New("")
+func (m *MockMemoAccountRepo) IncrBalance(ctx context.Context, accountId string, incr float64) error {
+	return nil
+}
+
+func (m *MockMemoAccountRepo) DecrBalance(ctx context.Context, accountId string, incr float64) error {
+	return nil
 }

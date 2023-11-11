@@ -14,6 +14,7 @@ type ITransactionRepo interface {
 	GetTransactionsHistory(context.Context, string, requestparams.GetTransactionsHistoryRequest) ([]*types.Transaction, error)
 	GetTransaction(context.Context, string) (*types.Transaction, error)
 	GetMultiBeneficiaryTransactions(context.Context, string) ([]*types.Transaction, error)
+	MakeTransferTransaction(context.Context, string, string, float64) error
 }
 type TransactionRepo struct {
 	db *sqlx.DB
@@ -143,4 +144,34 @@ func (tr TransactionRepo) GetMultiBeneficiaryTransactions(ctx context.Context, m
 		transactions = append(transactions, &transaction)
 	}
 	return transactions, nil
+}
+
+func (tr TransactionRepo) MakeTransferTransaction(ctx context.Context, from string, to string, amount float64) error {
+	tx, err := tr.db.Beginx()
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE 
+			accounts SET balance = balance - $1
+		WHERE id=$2`,
+		amount, from)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE 
+			accounts SET balance = balance + $1
+		WHERE id=$2`, amount, to)
+
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
 }

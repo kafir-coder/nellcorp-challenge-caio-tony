@@ -9,10 +9,7 @@ deps:
 
 clean:
 	rm -rf ./bin
-
-test:
-	go test ./..
-
+.
 docker-build:
 	docker build -t caiotony/nell_challenge-go 
 
@@ -20,4 +17,4 @@ docker-start:
 	docker-compose up --build -d
 
 docker-down:
-	docker compose down -v --remove-orphans
+	docker-compose down -v --remove-orphans

@@ -54,13 +54,74 @@ func (ah *AccountHandler) CreateAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = ah.accountSrv.CreateAccount(r.Context(), entity)
+	accountId, err := ah.accountSrv.CreateAccount(r.Context(), entity)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"id": accountId,
+	})
+}
+
+func (ah *AccountHandler) ListAccounts(w http.ResponseWriter, r *http.Request) {
+	data, err := utils.ExtracteQueryParams(r)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	filter := new(requestparams.ListAccountsRequest)
+
+	if err = json.Unmarshal(data, filter); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	isValidated := filter.Validate()
+	if !isValidated {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	accounts, err := ah.accountSrv.ListAccounts(r.Context(), *filter)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if len(accounts) == 0 {
+		json.NewEncoder(w).Encode([]map[string]string{})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(accounts)
+}
+
+func (ah *AccountHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
+	accountId := chi.URLParam(r, "id")
+	balance, err := ah.accountSrv.GetAccount(r.Context(), accountId)
+
+	if errors.Is(err, services.ErrInexistentAccount) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "There's no any bank account associated with this id",
+		})
+		return
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(balance)
 }
 
 func (ah *AccountHandler) GetAccountBalance(w http.ResponseWriter, r *http.Request) {
@@ -86,8 +147,19 @@ func (ah *AccountHandler) GetAccountBalance(w http.ResponseWriter, r *http.Reque
 }
 
 func (ah *AccountHandler) DepositMoney(w http.ResponseWriter, r *http.Request) {
+
 	accountId := chi.URLParam(r, "id")
+
 	amount, err := strconv.ParseFloat(r.URL.Query().Get("amount"), 64)
+
+	if amount <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid amount. Amount needs to be greater than 0",
+		})
+		return
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -110,6 +182,15 @@ func (ah *AccountHandler) DepositMoney(w http.ResponseWriter, r *http.Request) {
 func (ah *AccountHandler) WithdrawMoney(w http.ResponseWriter, r *http.Request) {
 	accountId := chi.URLParam(r, "id")
 	amount, err := strconv.ParseFloat(r.URL.Query().Get("amount"), 64)
+
+	if amount <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid amount. Amount needs to be greater than 0",
+		})
+		return
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -125,7 +206,7 @@ func (ah *AccountHandler) WithdrawMoney(w http.ResponseWriter, r *http.Request) 
 	if ah.accountSrv.HasInsufficientFunds(r.Context(), accountId, amount) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Insufficient funds to transfer",
+			"error": "Insufficient funds to withdraw",
 		})
 		return
 	}
@@ -154,6 +235,15 @@ func (ah *AccountHandler) TransferMoney(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	_, err = ah.accountSrv.GetAccount(r.Context(), request.From)
+
+	if err == services.ErrInexistentAccount {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "From account does not exist",
+		})
+		return
+	}
 	if ah.accountSrv.HasInsufficientFunds(r.Context(), request.From, request.Amount) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{
@@ -163,6 +253,15 @@ func (ah *AccountHandler) TransferMoney(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = ah.accountSrv.TransferMoney(r.Context(), request)
+
+	if errors.Is(err, services.ErrInexistentAccount) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "There are invalid recipients",
+		})
+		return
+	}
+
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -183,9 +282,12 @@ func (ah *AccountHandler) GetTransactionsHistory(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if filter.Page == "0" {
-		filter.Page = "1"
+	isValidated := filter.Validate()
+	if !isValidated {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
+
 	transactions, err := ah.accountSrv.GetTransactionsHistory(r.Context(), accountId, *filter)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -209,7 +311,15 @@ func (ah *AccountHandler) RefundMoney(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isValidated := request.Validate()
+
+	if !isValidated {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request parameters"})
+		return
+	}
 	if request.IsMultibenificiary {
+
 		err := ah.accountSrv.RefundMultibeneficiaryTransfer(r.Context(), request.MultiBeneficiaryId)
 
 		if err != nil {

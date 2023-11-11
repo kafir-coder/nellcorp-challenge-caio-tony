@@ -24,8 +24,12 @@ func NewAccount(accountRepo accountrepo.IAccountRepo, transactionRepo transactio
 	}
 }
 
-func (as *Account) CreateAccount(ctx context.Context, account *types.Account) error {
+func (as *Account) CreateAccount(ctx context.Context, account *types.Account) (string, error) {
 	return as.accountRepo.CreateAccount(ctx, account)
+}
+
+func (as *Account) ListAccounts(ctx context.Context, filters requestparams.ListAccountsRequest) ([]*types.Account, error) {
+	return as.accountRepo.ListAccounts(ctx, filters)
 }
 
 func (as *Account) GetAccountBalance(ctx context.Context, accountId string) (float64, error) {
@@ -37,6 +41,17 @@ func (as *Account) GetAccountBalance(ctx context.Context, accountId string) (flo
 		return 0, err
 	}
 	return balance, nil
+}
+
+func (as *Account) GetAccount(ctx context.Context, accountId string) (*types.Account, error) {
+	account, err := as.accountRepo.GetAccountById(ctx, accountId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrInexistentAccount
+		}
+		return nil, err
+	}
+	return account, nil
 }
 
 func (as *Account) DepositMoney(ctx context.Context, accountId string, amount float64) error {
@@ -85,6 +100,7 @@ func (as *Account) IsThereAlreadyAccountWithThisOwner(ctx context.Context, owner
 
 func (as *Account) HasInsufficientFunds(ctx context.Context, accountId string, amountToOut float64) bool {
 	balance, _ := as.accountRepo.GetAccountBalance(ctx, accountId)
+
 	return amountToOut > balance
 }
 
@@ -94,7 +110,21 @@ func (as *Account) TransferMoney(ctx context.Context, transferParams requestpara
 	if len(transferParams.Repcipients) > 1 {
 		multiBeneficiaryTransactionId = uuid.NewString()
 	}
+
 	for _, recipient := range transferParams.Repcipients {
+		_, err := as.accountRepo.GetAccountById(ctx, recipient.AccountId)
+
+		if err == sql.ErrNoRows {
+			return ErrInexistentAccount
+		}
+	}
+	for _, recipient := range transferParams.Repcipients {
+
+		err := as.transactionRepo.MakeTransferTransaction(ctx, transferParams.From, recipient.AccountId, recipient.Amount)
+
+		if err != nil {
+			return err
+		}
 
 		transaction := types.NewTransaction(
 			recipient.Amount,
@@ -107,18 +137,12 @@ func (as *Account) TransferMoney(ctx context.Context, transferParams requestpara
 			"",
 		)
 		as.transactionRepo.CreateTransaction(ctx, transaction)
-
-		as.accountRepo.DecrBalance(ctx, transferParams.From, recipient.Amount)
-		as.accountRepo.IncrBalance(ctx, recipient.AccountId, recipient.Amount)
 	}
 	return nil
 }
 
 func (as *Account) GetTransactionsHistory(ctx context.Context, accountId string, filters requestparams.GetTransactionsHistoryRequest) ([]*types.Transaction, error) {
 	return as.transactionRepo.GetTransactionsHistory(ctx, accountId, filters)
-}
-func (as *Account) IsTheSumofRecipientsAmountsGreaterThanTransferAmount(ctx context.Context) {
-
 }
 
 func (as *Account) RefundMoneyNormalTransfer(ctx context.Context, transactionId string) error {
@@ -140,6 +164,12 @@ func (as *Account) RefundMoneyNormalTransfer(ctx context.Context, transactionId 
 		return ErrInsufficientFunds
 	}
 
+	err = as.transactionRepo.MakeTransferTransaction(ctx, transaction.To, transaction.From, transaction.Amount)
+
+	if err != nil {
+		return err
+	}
+
 	newTransaction := types.NewTransaction(
 		transaction.Amount,
 		transaction.From,
@@ -148,13 +178,9 @@ func (as *Account) RefundMoneyNormalTransfer(ctx context.Context, transactionId 
 		string(utils.REFUND), "",
 		true,
 		transactionId)
-
-	as.accountRepo.DecrBalance(ctx, transaction.To, transaction.Amount)
-	as.accountRepo.IncrBalance(ctx, transaction.From, transaction.Amount)
 	as.transactionRepo.CreateTransaction(ctx, newTransaction)
 
 	return nil
-
 }
 
 func (as *Account) RefundMultibeneficiaryTransfer(ctx context.Context, multibeneficiaryId string) error {
@@ -172,6 +198,12 @@ func (as *Account) RefundMultibeneficiaryTransfer(ctx context.Context, multibene
 		if transaction.IsRefund {
 			return ErrUnableToRefundARefund
 		}
+		err = as.transactionRepo.MakeTransferTransaction(ctx, transaction.To, transaction.From, transaction.Amount)
+
+		if err != nil {
+			return err
+		}
+
 		newTransaction := types.NewTransaction(
 			transaction.Amount,
 			transaction.From,
@@ -180,9 +212,6 @@ func (as *Account) RefundMultibeneficiaryTransfer(ctx context.Context, multibene
 			string(utils.REFUND), "",
 			true,
 			transaction.ID)
-
-		as.accountRepo.DecrBalance(ctx, transaction.To, transaction.Amount)
-		as.accountRepo.IncrBalance(ctx, transaction.From, transaction.Amount)
 		as.transactionRepo.CreateTransaction(ctx, newTransaction)
 	}
 

@@ -1,3 +1,6 @@
+DROP DATABASE IF EXISTS nell_challenge_test;
+CREATE DATABASE nell_challenge_test;
+
 CREATE TABLE IF NOT EXISTS public.accounts (
   id VARCHAR(36) PRIMARY KEY,
   owner_id VARCHAR(36) NOT NULL,
